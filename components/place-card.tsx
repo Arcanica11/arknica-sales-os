@@ -11,7 +11,8 @@ import {
   FileText,
   Loader2,
   Eye,
-  MapPin, // Importamos el icono del mapa
+  MapPin,
+  Image as ImageIcon, // <--- ÚNICO CAMBIO EN IMPORTS
 } from "lucide-react";
 
 interface Place {
@@ -32,8 +33,8 @@ interface Lead {
 interface PlaceCardProps {
   place: Place;
   savedLead?: Lead;
-  existingAssetId?: string;
-  existingAssetType?: "demo" | "proposal";
+  demoId?: string;
+  proposalId?: string;
   isGenerating: boolean;
   onStatusChange: (
     placeId: string,
@@ -45,8 +46,8 @@ interface PlaceCardProps {
 export default function PlaceCard({
   place,
   savedLead,
-  existingAssetId,
-  existingAssetType,
+  demoId,
+  proposalId,
   isGenerating,
   onStatusChange,
   onGenerate,
@@ -99,10 +100,30 @@ export default function PlaceCard({
 
   const hasProfessionalWeb = place.website && !isSocialMedia(place.website);
 
-  // URL para buscar en Google Maps externo
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
     place.name + " " + place.address
   )}`;
+
+  // --- NUEVA LÓGICA WHATSAPP (Anti-Spam) ---
+  // No afecta el diseño, solo lo que pasa al hacer clic.
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!place.phone) return;
+
+    // 1. Mensaje Aleatorio (Para evitar baneo)
+    const saludos = ["Hola", "Qué tal", "Buenas", "Saludos a todo el equipo de"];
+    const saludo = saludos[Math.floor(Math.random() * saludos.length)];
+    
+    // 2. Contexto (Sin vender aún)
+    const mensaje = `${saludo} ${place.name}, soy vecino de la zona. Hice un diseño visual rápido de cómo se verían sus uniformes y menús renovados. Les adjunto la imagen, ¿qué opinan?`;
+
+    // 3. Abrir WhatsApp
+    const phone = place.phone.replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`, "_blank");
+
+    // 4. Marcar Contactado
+    if (currentStatus === "new") handleStatusUpdate("contacted");
+  };
 
   return (
     <div className="w-full flex flex-col md:flex-row md:items-center justify-between p-4 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors gap-4 group">
@@ -149,117 +170,92 @@ export default function PlaceCard({
 
       {/* DERECHA: Acciones */}
       <div className="flex items-center gap-2 mt-2 md:mt-0">
-        {/* 1. WhatsApp */}
+        {/* 1. WhatsApp (ACTUALIZADO CON LÓGICA) */}
         {place.phone && (
-          <a
-            href={`https://wa.me/${place.phone.replace(/[^0-9]/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              if (currentStatus === "new") handleStatusUpdate("contacted");
-            }}
+          <button
+            onClick={handleWhatsAppClick}
             className="w-8 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg border border-emerald-200 transition-colors"
-            title="Enviar WhatsApp"
+            title="Enviar WhatsApp (Mensaje Anti-Spam)"
           >
             <MessageCircle size={16} />
-          </a>
+          </button>
         )}
 
-        {/* 2. NUEVO: Ver en Google Maps Externo (Fotos, Reseñas) */}
+        {/* 2. Google Maps Externo */}
         <a
           href={googleMapsUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="w-8 h-8 flex items-center justify-center bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg border border-orange-200 transition-colors"
-          title="Ver fotos y reseñas en Google Maps"
+          title="Ver en Google Maps"
         >
           <MapPin size={16} />
         </a>
 
-        {/* 3. Visitar Web Actual (si tiene) */}
-        {hasProfessionalWeb && place.website && (
-          <a
-            href={place.website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-8 h-8 flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg border border-blue-200 transition-colors"
-            title="Ver Web Actual"
-          >
-            <ExternalLink size={16} />
-          </a>
-        )}
+        {/* Separador */}
+        <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
-        {/* 4. BOTONES DE GENERACIÓN IA */}
-        {existingAssetId ? (
-          // CASO: YA EXISTE UN ASSET -> BOTÓN "VER"
+        {/* 3. BOTÓN PROPUESTA (Ahora genera el Flyer) */}
+        {proposalId ? (
           <a
-            href={`/demo/${existingAssetId}`}
+            href={`/demo/${proposalId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm min-w-[130px] justify-center animate-in fade-in zoom-in duration-300"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+            title="Ver Flyer Generado"
           >
-            <Eye size={14} />
-            <span>Ver {existingAssetType === 'demo' ? 'Demo Web' : 'Propuesta'}</span>
+            <ImageIcon size={14} /> <span>Ver Flyer</span>
           </a>
         ) : (
-          // CASO: NO EXISTE ASSET AÚN
-          hasProfessionalWeb ? (
-            // TIENE WEB -> Botón Principal: Propuesta
+          <button
+            onClick={() => onGenerate(place, "proposal")}
+            disabled={isGenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+            title="Crear Flyer Visual"
+          >
+            {isGenerating ? (
+              <Loader2 size={14} className="animate-spin text-orange-500" />
+            ) : (
+              <ImageIcon size={14} className="text-orange-500" />
+            )}
+            <span>Crear Flyer</span>
+          </button>
+        )}
+
+        {/* 4. BOTÓN DEMO WEB (Sin cambios visuales) */}
+        {demoId ? (
+          <a
+            href={`/demo/${demoId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+            title="Ver Demo Web"
+          >
+            <Eye size={14} /> <span>Ver Demo</span>
+          </a>
+        ) : (
+          !hasProfessionalWeb && (
             <button
-              onClick={() => onGenerate(place, "proposal")}
+              onClick={() => onGenerate(place, "demo")}
               disabled={isGenerating}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed min-w-[130px] justify-center"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+              title="Generar Demo Web"
             >
               {isGenerating ? (
-                <>
-                  <Loader2 size={14} className="animate-spin text-orange-500" />
-                  <span>Escribiendo...</span>
-                </>
+                <Loader2 size={14} className="animate-spin text-white" />
               ) : (
-                <>
-                  <FileText size={14} className="text-orange-500" />
-                  <span>Crear Propuesta</span>
-                </>
+                <Zap size={14} className="text-white" />
               )}
+              <span>Generar Demo</span>
             </button>
-          ) : (
-            // NO TIENE WEB -> Botón Principal: Demo + Botón Pequeño: Propuesta
-            <div className="flex items-center gap-2">
-              {/* Botón pequeño de Propuesta (Siempre disponible) */}
-              <button
-                 onClick={() => onGenerate(place, "proposal")}
-                 disabled={isGenerating}
-                 className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg border border-gray-300 transition-colors"
-                 title="Generar solo Propuesta"
-               >
-                 {isGenerating ? <Loader2 size={16} className="animate-spin"/> : <FileText size={16} />}
-              </button>
-              
-              {/* Botón grande de Demo */}
-              <button
-                onClick={() => onGenerate(place, "demo")}
-                disabled={isGenerating}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed min-w-[130px] justify-center"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin text-red-500" />
-                    <span>Creando Web...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={14} className="text-red-500" />
-                    <span>Generar Demo</span>
-                  </>
-                )}
-              </button>
-            </div>
           )
         )}
 
         {/* 5. Marcar Vendido */}
         <button
-          onClick={() => handleStatusUpdate(currentStatus === 'sold' ? 'new' : 'sold')}
+          onClick={() =>
+            handleStatusUpdate(currentStatus === "sold" ? "new" : "sold")
+          }
           disabled={loading}
           className={cn(
             "w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ml-1",

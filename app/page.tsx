@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
 import {
   Search,
   MapPin,
@@ -15,6 +14,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
+import { cn } from "@/lib/utils";
 import PlaceCard from "@/components/place-card";
 import MapView from "@/components/map-view";
 
@@ -141,15 +141,19 @@ export default function Dashboard() {
         }),
       });
       const data = await res.json();
-      
+
       if (data.id) {
         // Actualizamos la lista de assets localmente para que aparezca el botón "Ver Demo" sin recargar
-        setAssets(prev => [...prev, { id: data.id, place_name: place.name, type }]);
-        
+        setAssets((prev) => [
+          ...prev,
+          { id: data.id, place_name: place.name, type },
+        ]);
+
         if (type === "demo") {
           const url = `/demo/${data.id}`;
           const newWindow = window.open(url, "_blank");
-          if (!newWindow) alert(`¡Demo lista! Permitir popups para abrir: ${url}`);
+          if (!newWindow)
+            alert(`¡Demo lista! Permitir popups para abrir: ${url}`);
         } else {
           alert("Propuesta generada correctamente. ID: " + data.id);
         }
@@ -184,13 +188,6 @@ export default function Dashboard() {
     return socialDomains.some((domain) => lower.includes(domain));
   };
 
-  const countNoWeb = places.filter(
-    (p) => !p.website || isSocialMedia(p.website)
-  ).length;
-  const countWithWeb = places.filter(
-    (p) => p.website && !isSocialMedia(p.website)
-  ).length;
-
   const filteredPlaces = places.filter((place) => {
     const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
     if (filterMode === "no-web")
@@ -198,6 +195,13 @@ export default function Dashboard() {
     if (filterMode === "with-web") return hasEffectiveWebsite;
     return true;
   });
+
+  const countNoWeb = places.filter(
+    (p) => !p.website || isSocialMedia(p.website)
+  ).length;
+  const countWithWeb = places.filter(
+    (p) => p.website && !isSocialMedia(p.website)
+  ).length;
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -348,9 +352,14 @@ export default function Dashboard() {
                 </div>
               )}
               {filteredPlaces.map((place) => {
-                // Buscamos si ya existe un demo/propuesta para este local (por nombre)
-                const existingAsset = assets.find(a => a.place_name === place.name);
-                
+                // Buscamos si ya existen demos O propuestas separadamente
+                const demoAsset = assets.find(
+                  (a) => a.place_name === place.name && a.type === "demo"
+                );
+                const proposalAsset = assets.find(
+                  (a) => a.place_name === place.name && a.type === "proposal"
+                );
+
                 return (
                   <PlaceCard
                     key={place.place_id}
@@ -358,8 +367,8 @@ export default function Dashboard() {
                     savedLead={savedLeads.find(
                       (l) => l.place_id === place.place_id
                     )}
-                    existingAssetId={existingAsset?.id} // Pasamos el ID del asset existente
-                    existingAssetType={existingAsset?.type} // Pasamos el tipo
+                    demoId={demoAsset?.id}
+                    proposalId={proposalAsset?.id}
                     isGenerating={generating === place.place_id}
                     onStatusChange={handleStatusChange}
                     onGenerate={handleGenerate}
