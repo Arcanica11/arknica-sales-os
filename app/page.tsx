@@ -14,15 +14,9 @@ import {
   WifiOff,
 } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
-import clsx from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "@/lib/utils";
 import PlaceCard from "@/components/place-card";
 import MapView from "@/components/map-view";
-
-// Helper for classes
-function cnBase(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface Place {
   place_id: string;
@@ -101,6 +95,9 @@ export default function Dashboard() {
           setPlaces(data.results);
         }
         setNextPageToken(data.nextPageToken || null);
+
+        // Refresh leads status slightly after result change to ensure sync if needed,
+        // though strictly not necessary if we use the savedLeads state properly.
         fetchSavedLeads();
       }
     } catch (error) {
@@ -162,15 +159,11 @@ export default function Dashboard() {
     });
   };
 
-  // Helper Logic
+  // Improved Logic
   const isSocialMedia = (url: string | null) => {
     if (!url) return false;
-    const lower = url.toLowerCase();
-    return (
-      lower.includes("facebook") ||
-      lower.includes("instagram") ||
-      lower.includes("tiktok") ||
-      lower.includes("twitter")
+    return ["facebook", "instagram", "tiktok", "twitter"].some((social) =>
+      url.toLowerCase().includes(social)
     );
   };
 
@@ -179,15 +172,21 @@ export default function Dashboard() {
     const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
 
     if (filterMode === "no-web") {
-      // Show if NO website OR is Social Media
       return !place.website || isSocialMedia(place.website);
     }
     if (filterMode === "with-web") {
-      // Show ONLY if has website AND it is NOT social media
       return hasEffectiveWebsite;
     }
     return true;
   });
+
+  // Counters
+  const countNoWeb = places.filter(
+    (p) => !p.website || isSocialMedia(p.website)
+  ).length;
+  const countWithWeb = places.filter(
+    (p) => p.website && !isSocialMedia(p.website)
+  ).length;
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -212,7 +211,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
+      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6">
         {/* Search Panel */}
         <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <form
@@ -271,69 +270,69 @@ export default function Dashboard() {
             <Tabs.List className="flex gap-1">
               <Tabs.Trigger
                 value="list"
-                className={cnBase(
+                className={cn(
                   "px-5 py-2.5 rounded-t-lg font-semibold text-sm flex items-center gap-2 transition-all border-b-2",
                   activeTab === "list"
                     ? "border-orange-500 text-orange-600 bg-orange-50/50"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <LayoutGrid size={18} /> Resultados ({places.length})
+                <LayoutGrid size={18} /> Lista ({places.length})
               </Tabs.Trigger>
               <Tabs.Trigger
                 value="map"
-                className={cnBase(
+                className={cn(
                   "px-5 py-2.5 rounded-t-lg font-semibold text-sm flex items-center gap-2 transition-all border-b-2",
                   activeTab === "map"
                     ? "border-blue-500 text-blue-600 bg-blue-50/50"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <MapIcon size={18} /> Explorar Mapa
+                <MapIcon size={18} /> Mapa
               </Tabs.Trigger>
             </Tabs.List>
 
-            {/* Filter Pills */}
+            {/* Filter Pills with Counters */}
             <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm mb-2">
               <button
                 onClick={() => setFilterMode("all")}
-                className={cnBase(
+                className={cn(
                   "px-4 py-1.5 text-xs font-bold rounded-md transition-colors",
                   filterMode === "all"
                     ? "bg-gray-100 text-gray-900"
                     : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                Todos
+                Todos ({places.length})
               </button>
               <button
                 onClick={() => setFilterMode("no-web")}
-                className={cnBase(
+                className={cn(
                   "px-4 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5",
                   filterMode === "no-web"
                     ? "bg-red-50 text-red-600 ring-1 ring-red-200"
                     : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                <WifiOff size={14} /> Sin Sitio Web
+                <WifiOff size={14} /> Sin Web ({countNoWeb})
               </button>
               <button
                 onClick={() => setFilterMode("with-web")}
-                className={cnBase(
+                className={cn(
                   "px-4 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5",
                   filterMode === "with-web"
                     ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
                     : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                <Globe size={14} /> Con Sitio Web
+                <Globe size={14} /> Con Web ({countWithWeb})
               </button>
             </div>
           </div>
 
           <Tabs.Content
             value="list"
-            className="space-y-8 focus:outline-none min-h-[500px]"
+            className="space-y-4 focus:outline-none min-h-[500px]"
           >
             {places.length === 0 && !loading && (
               <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
@@ -344,8 +343,8 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Grid Container Fixed */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-24 items-start">
+            {/* List Container Fixed */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col divide-y divide-gray-100 shadow-sm">
               {filteredPlaces.map((place) => (
                 <PlaceCard
                   key={place.place_id}
@@ -360,16 +359,16 @@ export default function Dashboard() {
             </div>
 
             {places.length > 0 && nextPageToken && (
-              <div className="flex justify-center w-full">
+              <div className="flex justify-center w-full pt-4 pb-12">
                 <button
                   onClick={loadMore}
                   disabled={loading}
-                  className="w-full max-w-md py-4 border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-sm"
+                  className="w-full max-w-md py-3 border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-sm text-sm"
                 >
                   {loading ? (
-                    <Loader2 className="animate-spin" />
+                    <Loader2 className="animate-spin" size={16} />
                   ) : (
-                    <RefreshCw />
+                    <RefreshCw size={16} />
                   )}
                   Cargar 20 Resultados Más
                 </button>

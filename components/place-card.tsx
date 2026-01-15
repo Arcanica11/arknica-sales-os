@@ -8,14 +8,8 @@ import {
   Zap,
   Check,
   FileText,
-  Smartphone,
 } from "lucide-react";
-import clsx from "clsx";
-import { twMerge } from "tailwind-merge";
-
-function cnBase(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "@/lib/utils";
 
 interface Place {
   place_id: string;
@@ -87,160 +81,154 @@ export default function PlaceCard({
   const isSocialMedia = (url: string | null) => {
     if (!url) return false;
     const lower = url.toLowerCase();
-    return (
-      lower.includes("facebook") ||
-      lower.includes("instagram") ||
-      lower.includes("tiktok") ||
-      lower.includes("twitter")
+    return ["facebook", "instagram", "tiktok", "twitter"].some((social) =>
+      lower.includes(social)
     );
   };
 
   const hasProfessionalWeb = place.website && !isSocialMedia(place.website);
 
-  // Badge logic
-  const renderWebBadge = () => {
-    if (hasProfessionalWeb) {
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-          Con Sitio Web
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-        {place.website ? "Solo Red Social" : "Sin Sitio Web"}
-      </span>
-    );
-  };
-
   return (
-    <div className="h-full flex flex-col p-5 rounded-xl bg-white border border-gray-100 shadow-md hover:shadow-xl transition-all duration-300 group relative overflow-hidden">
-      {/* Top Status Border/Line */}
-      <div
-        className={cnBase(
-          "absolute top-0 left-0 w-full h-1",
-          currentStatus === "sold"
-            ? "bg-emerald-500"
-            : currentStatus === "contacted"
-            ? "bg-orange-400"
-            : "bg-gray-200"
-        )}
-      ></div>
-
-      <div className="flex justify-between items-start mb-3 mt-2">
-        <div className="flex-1 min-w-0 pr-2">
+    <div
+      className={cn(
+        "flex flex-row items-center justify-between p-4 bg-white hover:bg-gray-50 transition-colors h-[80px] group",
+        currentStatus === "sold" && "bg-emerald-50/50"
+      )}
+    >
+      {/* Left: Info */}
+      <div className="flex flex-col justify-center min-w-0 flex-1 pr-6">
+        <div className="flex items-center gap-3">
           <h3
-            className="font-bold text-gray-900 text-lg truncate leading-tight mb-1"
+            className="font-bold text-gray-900 text-sm truncate"
             title={place.name}
           >
             {place.name}
           </h3>
-          {renderWebBadge()}
+          {place.phone && (
+            <span className="text-[10px] text-gray-400 font-mono hidden sm:inline">
+              {place.phone}
+            </span>
+          )}
         </div>
-        <div className="flex flex-col items-end gap-1">
-          {/* CRM Status Badge */}
-          <span
-            className={cnBase(
-              "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border",
-              currentStatus === "new"
-                ? "bg-gray-100 text-gray-500 border-gray-200"
-                : currentStatus === "contacted"
-                ? "bg-orange-50 text-orange-600 border-orange-200"
-                : "bg-emerald-50 text-emerald-600 border-emerald-200"
-            )}
-          >
-            {currentStatus === "new"
-              ? "Nuevo"
-              : currentStatus === "contacted"
-              ? "Contactado"
-              : "Vendido"}
-          </span>
-        </div>
+        <p
+          className="text-gray-500 text-xs truncate mt-0.5"
+          title={place.address}
+        >
+          {place.address}
+        </p>
       </div>
 
-      <p className="text-gray-500 text-xs mb-5 line-clamp-2 min-h-[2.5em]">
-        {place.address}
-      </p>
+      {/* Center: Badges */}
+      <div className="flex items-center gap-3 mr-6 shrink-0">
+        {/* Web Badge */}
+        {hasProfessionalWeb ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+            WEB OK
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+            {place.website ? "SOCIAL" : "NO WEB"}
+          </span>
+        )}
 
-      <div className="mt-auto space-y-3">
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* WhatsApp Action */}
-          {place.phone ? (
-            <a
-              href={`https://wa.me/${place.phone.replace(
-                /[^0-9]/g,
-                ""
-              )}?text=${encodeURIComponent(
-                `Hola ${place.name}, le saludamos de Rueda La Rola Media...`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => {
-                if (currentStatus === "new") handleStatusUpdate("contacted");
-              }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors"
-            >
-              <MessageCircle size={14} /> Contactar
-            </a>
-          ) : (
-            <button
-              disabled
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 text-gray-300 border border-gray-100 rounded-lg text-xs font-semibold cursor-not-allowed"
-            >
-              <Smartphone size={14} /> No Phone
-            </button>
+        {/* CRM Status Badge */}
+        <span
+          className={cn(
+            "px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider border",
+            currentStatus === "new"
+              ? "bg-gray-100 text-gray-500 border-gray-200"
+              : currentStatus === "contacted"
+              ? "bg-orange-50 text-orange-600 border-orange-200"
+              : "bg-emerald-50 text-emerald-600 border-emerald-200"
           )}
+        >
+          {currentStatus === "new"
+            ? "NUEVO"
+            : currentStatus === "contacted"
+            ? "CONTACTADO"
+            : "VENDIDO"}
+        </span>
+      </div>
 
-          {/* Web Link or Disabled */}
-          {place.website ? (
-            <a
-              href={place.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition-colors truncate"
-            >
-              <ExternalLink size={14} /> Visitar
-            </a>
-          ) : (
-            <div className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg text-xs font-semibold">
-              <ExternalLink size={14} /> Offline
-            </div>
-          )}
-        </div>
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* WhatsApp */}
+        {place.phone && (
+          <a
+            href={`https://wa.me/${place.phone.replace(
+              /[^0-9]/g,
+              ""
+            )}?text=${encodeURIComponent(
+              `Hola ${place.name}, le saludamos de Rueda La Rola Media...`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              if (currentStatus === "new") handleStatusUpdate("contacted");
+            }}
+            className="h-8 w-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg transition-colors"
+            title="WhatsApp"
+          >
+            <MessageCircle size={16} />
+          </a>
+        )}
 
-        <div className="border-t border-gray-100 pt-3 flex justify-between items-center">
-          {/* Primary Magic Action */}
-          {hasProfessionalWeb ? (
-            <button
-              onClick={() => onGenerate(place, "proposal")}
-              className="flex items-center gap-2 text-gray-600 hover:text-orange-600 text-xs font-bold transition-all group-hover:translate-x-1"
-            >
-              <FileText size={14} className="text-orange-500" />
-              Crear Propuesta (Audit)
-            </button>
-          ) : (
-            <button
-              onClick={() => onGenerate(place, "demo")}
-              className="flex items-center gap-2 text-gray-600 hover:text-red-600 text-xs font-bold transition-all group-hover:translate-x-1"
-            >
-              <Zap size={14} className="text-red-500" />
-              Generar Demo Web
-            </button>
-          )}
+        {/* Web Link */}
+        {place.website ? (
+          <a
+            href={place.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-8 w-8 flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg transition-colors"
+            title="Visitar Web"
+          >
+            <ExternalLink size={16} />
+          </a>
+        ) : (
+          <div className="h-8 w-8 flex items-center justify-center bg-gray-50 text-gray-300 border border-gray-100 rounded-lg cursor-not-allowed">
+            <ExternalLink size={16} />
+          </div>
+        )}
 
-          {/* Quick Sold Toggle */}
-          {currentStatus !== "sold" && (
-            <button
-              onClick={() => handleStatusUpdate("sold")}
-              disabled={loading}
-              className="text-gray-300 hover:text-emerald-500 transition-colors"
-              title="Marcar como Vendido"
-            >
-              <Check size={16} />
-            </button>
+        <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+        {/* Primary Magic Action */}
+        {hasProfessionalWeb ? (
+          <button
+            onClick={() => onGenerate(place, "proposal")}
+            className="h-8 px-3 flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 hover:border-orange-300 text-gray-600 hover:text-orange-600 rounded-lg text-xs font-bold transition-all shadow-sm"
+          >
+            <FileText size={14} className="text-orange-500" />
+            <span className="hidden lg:inline">Audit</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onGenerate(place, "demo")}
+            className="h-8 px-3 flex items-center gap-2 bg-red-600 hover:bg-red-500 border border-red-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+          >
+            <Zap size={14} className="fill-white" />
+            <span className="hidden lg:inline">Demo</span>
+          </button>
+        )}
+
+        {/* Quick Sold Checkbox-style */}
+        <button
+          onClick={() =>
+            handleStatusUpdate(currentStatus === "sold" ? "contacted" : "sold")
+          }
+          disabled={loading}
+          className={cn(
+            "h-8 w-8 flex items-center justify-center rounded-lg border transition-colors ml-1",
+            currentStatus === "sold"
+              ? "bg-emerald-500 border-emerald-600 text-white"
+              : "bg-white border-gray-200 text-gray-300 hover:border-emerald-400 hover:text-emerald-400"
           )}
-        </div>
+          title={
+            currentStatus === "sold" ? "Desmarcar Vendido" : "Marcar Vendido"
+          }
+        >
+          <Check size={16} />
+        </button>
       </div>
     </div>
   );
