@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import {
   Search,
   MapPin,
@@ -14,7 +15,6 @@ import {
   WifiOff,
 } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { cn } from "@/lib/utils";
 import PlaceCard from "@/components/place-card";
 import MapView from "@/components/map-view";
 
@@ -33,34 +33,46 @@ interface Lead {
   id?: string;
 }
 
+// Nueva interfaz para los assets
+interface Asset {
+  id: string;
+  place_name: string;
+  type: "demo" | "proposal";
+}
+
 export default function Dashboard() {
-  // State
   const [city, setCity] = useState("");
   const [category, setCategory] = useState("");
   const [places, setPlaces] = useState<Place[]>([]);
   const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]); // Estado para guardar los demos encontrados
   const [loading, setLoading] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("list");
   const [generating, setGenerating] = useState<string | null>(null);
 
-  // Filter State
   const [filterMode, setFilterMode] = useState<"all" | "no-web" | "with-web">(
     "all"
   );
 
-  // Initial Load of Saved Leads
   useEffect(() => {
     fetchSavedLeads();
+    fetchAssets(); // Cargamos los assets al iniciar
   }, []);
 
   const fetchSavedLeads = async () => {
     const { data } = await supabase
       .from("leads")
       .select("place_id, status, id");
-    if (data) {
-      setSavedLeads(data as Lead[]);
-    }
+    if (data) setSavedLeads(data as Lead[]);
+  };
+
+  // Nueva función para traer los demos existentes
+  const fetchAssets = async () => {
+    const { data } = await supabase
+      .from("generated_assets")
+      .select("id, place_name, type");
+    if (data) setAssets(data as Asset[]);
   };
 
   const handleSearch = async (
@@ -95,10 +107,8 @@ export default function Dashboard() {
           setPlaces(data.results);
         }
         setNextPageToken(data.nextPageToken || null);
-
-        // Refresh leads status slightly after result change to ensure sync if needed,
-        // though strictly not necessary if we use the savedLeads state properly.
         fetchSavedLeads();
+        fetchAssets(); // Refrescamos assets por si acaso
       }
     } catch (error) {
       console.error("Search failed", error);
@@ -131,14 +141,22 @@ export default function Dashboard() {
         }),
       });
       const data = await res.json();
-      if (data.id && type === "demo") {
-        window.open(`/demo/${data.id}`, "_blank");
-      } else {
-        alert("Asset Generado! ID: " + data.id);
+      
+      if (data.id) {
+        // Actualizamos la lista de assets localmente para que aparezca el botón "Ver Demo" sin recargar
+        setAssets(prev => [...prev, { id: data.id, place_name: place.name, type }]);
+        
+        if (type === "demo") {
+          const url = `/demo/${data.id}`;
+          const newWindow = window.open(url, "_blank");
+          if (!newWindow) alert(`¡Demo lista! Permitir popups para abrir: ${url}`);
+        } else {
+          alert("Propuesta generada correctamente. ID: " + data.id);
+        }
       }
     } catch (error) {
       console.error("Generation failed", error);
-      alert("Error generando asset");
+      alert("Error generando asset. Intenta de nuevo.");
     } finally {
       setGenerating(null);
     }
@@ -159,28 +177,13 @@ export default function Dashboard() {
     });
   };
 
-  // Improved Logic
   const isSocialMedia = (url: string | null) => {
     if (!url) return false;
-    return ["facebook", "instagram", "tiktok", "twitter"].some((social) =>
-      url.toLowerCase().includes(social)
-    );
+    const lower = url.toLowerCase();
+    const socialDomains = ["facebook", "instagram", "tiktok", "twitter"];
+    return socialDomains.some((domain) => lower.includes(domain));
   };
 
-  // Filter Logic
-  const filteredPlaces = places.filter((place) => {
-    const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
-
-    if (filterMode === "no-web") {
-      return !place.website || isSocialMedia(place.website);
-    }
-    if (filterMode === "with-web") {
-      return hasEffectiveWebsite;
-    }
-    return true;
-  });
-
-  // Counters
   const countNoWeb = places.filter(
     (p) => !p.website || isSocialMedia(p.website)
   ).length;
@@ -188,9 +191,16 @@ export default function Dashboard() {
     (p) => p.website && !isSocialMedia(p.website)
   ).length;
 
+  const filteredPlaces = places.filter((place) => {
+    const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
+    if (filterMode === "no-web")
+      return !place.website || isSocialMedia(place.website);
+    if (filterMode === "with-web") return hasEffectiveWebsite;
+    return true;
+  });
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
@@ -211,8 +221,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-6">
-        {/* Search Panel */}
+      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
         <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <form
             onSubmit={(e) => handleSearch(e)}
@@ -227,8 +236,8 @@ export default function Dashboard() {
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ej. Restaurantes, Dentistas, Abogados..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all font-medium"
+                placeholder="Ej. Restaurantes, Dentistas..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-medium focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all"
               />
             </div>
             <div className="md:col-span-4 space-y-2">
@@ -239,8 +248,8 @@ export default function Dashboard() {
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Ej. Madrid, Bogotá, CDMX..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all font-medium"
+                placeholder="Ej. Madrid, Bogotá..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-medium focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all"
               />
             </div>
             <div className="md:col-span-3">
@@ -260,7 +269,6 @@ export default function Dashboard() {
           </form>
         </section>
 
-        {/* Content Area with Tabs */}
         <Tabs.Root
           value={activeTab}
           onValueChange={setActiveTab}
@@ -277,7 +285,7 @@ export default function Dashboard() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <LayoutGrid size={18} /> Lista ({places.length})
+                <LayoutGrid size={18} /> Resultados ({places.length})
               </Tabs.Trigger>
               <Tabs.Trigger
                 value="map"
@@ -288,11 +296,10 @@ export default function Dashboard() {
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <MapIcon size={18} /> Mapa
+                <MapIcon size={18} /> Explorar Mapa
               </Tabs.Trigger>
             </Tabs.List>
 
-            {/* Filter Pills with Counters */}
             <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm mb-2">
               <button
                 onClick={() => setFilterMode("all")}
@@ -332,45 +339,48 @@ export default function Dashboard() {
 
           <Tabs.Content
             value="list"
-            className="space-y-4 focus:outline-none min-h-[500px]"
+            className="space-y-8 focus:outline-none min-h-[500px]"
           >
-            {places.length === 0 && !loading && (
-              <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                <Search className="w-12 h-12 mb-4 opacity-20" />
-                <p className="font-medium">
-                  Define rubro y ciudad para comenzar la búsqueda
-                </p>
-              </div>
-            )}
-
-            {/* List Container Fixed */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col divide-y divide-gray-100 shadow-sm">
-              {filteredPlaces.map((place) => (
-                <PlaceCard
-                  key={place.place_id}
-                  place={place}
-                  savedLead={savedLeads.find(
-                    (l) => l.place_id === place.place_id
-                  )}
-                  onStatusChange={handleStatusChange}
-                  onGenerate={handleGenerate}
-                />
-              ))}
+            <div className="flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm divide-y divide-gray-100">
+              {filteredPlaces.length === 0 && !loading && (
+                <div className="p-12 text-center text-gray-400">
+                  <p>No hay resultados para mostrar.</p>
+                </div>
+              )}
+              {filteredPlaces.map((place) => {
+                // Buscamos si ya existe un demo/propuesta para este local (por nombre)
+                const existingAsset = assets.find(a => a.place_name === place.name);
+                
+                return (
+                  <PlaceCard
+                    key={place.place_id}
+                    place={place}
+                    savedLead={savedLeads.find(
+                      (l) => l.place_id === place.place_id
+                    )}
+                    existingAssetId={existingAsset?.id} // Pasamos el ID del asset existente
+                    existingAssetType={existingAsset?.type} // Pasamos el tipo
+                    isGenerating={generating === place.place_id}
+                    onStatusChange={handleStatusChange}
+                    onGenerate={handleGenerate}
+                  />
+                );
+              })}
             </div>
 
             {places.length > 0 && nextPageToken && (
-              <div className="flex justify-center w-full pt-4 pb-12">
+              <div className="flex justify-center w-full pt-4">
                 <button
                   onClick={loadMore}
                   disabled={loading}
-                  className="w-full max-w-md py-3 border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-sm text-sm"
+                  className="px-8 py-3 bg-white border border-gray-300 text-gray-600 hover:text-gray-900 hover:border-gray-400 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm"
                 >
                   {loading ? (
-                    <Loader2 className="animate-spin" size={16} />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <RefreshCw size={16} />
+                    <RefreshCw size={18} />
                   )}
-                  Cargar 20 Resultados Más
+                  Cargar Más Resultados
                 </button>
               </div>
             )}
