@@ -12,33 +12,13 @@ import {
   Loader2,
   Globe,
   WifiOff,
+  Kanban,
 } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 import PlaceCard from "@/components/place-card";
 import MapView from "@/components/map-view";
-
-interface Place {
-  place_id: string;
-  name: string;
-  address: string;
-  website: string | null;
-  phone: string | null;
-  location: { latitude: number; longitude: number };
-}
-
-interface Lead {
-  place_id: string;
-  status: "new" | "contacted" | "sold";
-  id?: string;
-}
-
-// Nueva interfaz para los assets
-interface Asset {
-  id: string;
-  place_name: string;
-  type: "demo" | "proposal";
-}
+import { Place, Lead, Asset } from "@/lib/types";
 
 export default function Dashboard() {
   const [city, setCity] = useState("");
@@ -63,7 +43,7 @@ export default function Dashboard() {
   const fetchSavedLeads = async () => {
     const { data } = await supabase
       .from("leads")
-      .select("place_id, status, id");
+      .select("place_id, status, id, name, address, phone, website");
     if (data) setSavedLeads(data as Lead[]);
   };
 
@@ -157,6 +137,36 @@ export default function Dashboard() {
         } else {
           alert("Propuesta generada correctamente. ID: " + data.id);
         }
+
+        // --- AUTO-SAVE LOGIC (Status: Contacted) ---
+        // If lead is not already 'sold' or 'rejected', mark as 'contacted'
+        const currentLead = savedLeads.find(
+          (l) => l.place_id === place.place_id
+        );
+        if (!currentLead || currentLead.status === "new") {
+          const newStatus = "contacted";
+
+          // 1. Update Supabase
+          const { error: dbError } = await supabase.from("leads").upsert(
+            {
+              place_id: place.place_id,
+              name: place.name,
+              address: place.address,
+              phone: place.phone,
+              website: place.website,
+              status: newStatus,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "place_id" }
+          );
+
+          if (!dbError) {
+            // 2. Update Local State (This triggers filtering)
+            handleStatusChange(place.place_id, newStatus);
+          } else {
+            console.error("Auto-save failed", dbError);
+          }
+        }
       }
     } catch (error) {
       console.error("Generation failed", error);
@@ -168,7 +178,7 @@ export default function Dashboard() {
 
   const handleStatusChange = (
     placeId: string,
-    newStatus: "new" | "contacted" | "sold"
+    newStatus: "new" | "contacted" | "sold" | "rejected"
   ) => {
     setSavedLeads((prev) => {
       const exists = prev.find((l) => l.place_id === placeId);
@@ -177,7 +187,18 @@ export default function Dashboard() {
           l.place_id === placeId ? { ...l, status: newStatus } : l
         );
       }
-      return [...prev, { place_id: placeId, status: newStatus }];
+
+      // If adding new, try to find full details from 'places' state to store in 'savedLeads'
+      const placeDetails = places.find((p) => p.place_id === placeId);
+      const newLead: Lead = {
+        place_id: placeId,
+        status: newStatus,
+        name: placeDetails?.name,
+        address: placeDetails?.address,
+        phone: placeDetails?.phone || undefined,
+        website: placeDetails?.website,
+      };
+      return [...prev, newLead];
     });
   };
 
@@ -189,6 +210,12 @@ export default function Dashboard() {
   };
 
   const filteredPlaces = places.filter((place) => {
+    // 1. Smart Filter: Exclude if already in pipeline (contacted, sold, rejected)
+    const saved = savedLeads.find((l) => l.place_id === place.place_id);
+    if (saved && ["contacted", "sold", "rejected"].includes(saved.status)) {
+      return false;
+    }
+
     const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
     if (filterMode === "no-web")
       return !place.website || isSocialMedia(place.website);
@@ -302,6 +329,17 @@ export default function Dashboard() {
               >
                 <MapIcon size={18} /> Explorar Mapa
               </Tabs.Trigger>
+              <Tabs.Trigger
+                value="pipeline"
+                className={cn(
+                  "px-5 py-2.5 rounded-t-lg font-semibold text-sm flex items-center gap-2 transition-all border-b-2",
+                  activeTab === "pipeline"
+                    ? "border-purple-500 text-purple-600 bg-purple-50/50"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                )}
+              >
+                <Kanban size={18} /> Mi Gestión
+              </Tabs.Trigger>
             </Tabs.List>
 
             <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm mb-2">
@@ -370,6 +408,7 @@ export default function Dashboard() {
                     demoId={demoAsset?.id}
                     proposalId={proposalAsset?.id}
                     isGenerating={generating === place.place_id}
+                    searchCity={city}
                     onStatusChange={handleStatusChange}
                     onGenerate={handleGenerate}
                   />
@@ -409,6 +448,162 @@ export default function Dashboard() {
               onGenerate={handleGenerate}
               onSearchArea={handleAreaSearch}
             />
+          </Tabs.Content>
+
+          <Tabs.Content
+            value="pipeline"
+            className="focus:outline-none min-h-[500px]"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Columna Contactados */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-orange-200">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <h3 className="font-bold text-gray-700">
+                    Propuestas Enviadas
+                  </h3>
+                  <span className="ml-auto bg-gray-100 px-2 py-0.5 rounded text-xs font-bold text-gray-600">
+                    {savedLeads.filter((l) => l.status === "contacted").length}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {savedLeads
+                    .filter((l) => l.status === "contacted")
+                    .map((lead) => {
+                      // Reconsturir objeto Place para reutilizar PlaceCard
+                      const place: Place = {
+                        place_id: lead.place_id,
+                        name: lead.name || "Sin nombre",
+                        address: lead.address || "",
+                        website: lead.website || null,
+                        phone: lead.phone || null,
+                        location: { latitude: 0, longitude: 0 },
+                      };
+
+                      const demoAsset = assets.find(
+                        (a) => a.place_name === lead.name && a.type === "demo"
+                      );
+                      const proposalAsset = assets.find(
+                        (a) =>
+                          a.place_name === lead.name && a.type === "proposal"
+                      );
+
+                      return (
+                        <div
+                          key={lead.place_id}
+                          className="border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+                        >
+                          <PlaceCard
+                            place={place}
+                            savedLead={lead}
+                            demoId={demoAsset?.id}
+                            proposalId={proposalAsset?.id}
+                            isGenerating={generating === lead.place_id}
+                            onStatusChange={handleStatusChange}
+                            onGenerate={handleGenerate}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Columna Vendidos */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-emerald-200">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <h3 className="font-bold text-gray-700">Clientes Ganados</h3>
+                  <span className="ml-auto bg-gray-100 px-2 py-0.5 rounded text-xs font-bold text-gray-600">
+                    {savedLeads.filter((l) => l.status === "sold").length}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {savedLeads
+                    .filter((l) => l.status === "sold")
+                    .map((lead) => {
+                      const place: Place = {
+                        place_id: lead.place_id,
+                        name: lead.name || "Sin nombre",
+                        address: lead.address || "",
+                        website: lead.website || null,
+                        phone: lead.phone || null,
+                        location: { latitude: 0, longitude: 0 },
+                      };
+                      const demoAsset = assets.find(
+                        (a) => a.place_name === lead.name && a.type === "demo"
+                      );
+                      const proposalAsset = assets.find(
+                        (a) =>
+                          a.place_name === lead.name && a.type === "proposal"
+                      );
+                      return (
+                        <div
+                          key={lead.place_id}
+                          className="border border-gray-200 rounded-xl overflow-hidden shadow-sm opacity-90 hover:opacity-100 transition-opacity"
+                        >
+                          <PlaceCard
+                            place={place}
+                            savedLead={lead}
+                            demoId={demoAsset?.id}
+                            proposalId={proposalAsset?.id}
+                            isGenerating={generating === lead.place_id}
+                            onStatusChange={handleStatusChange}
+                            onGenerate={handleGenerate}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* Columna Descartados */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-red-200">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <h3 className="font-bold text-gray-700">Descartados</h3>
+                  <span className="ml-auto bg-gray-100 px-2 py-0.5 rounded text-xs font-bold text-gray-600">
+                    {savedLeads.filter((l) => l.status === "rejected").length}
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {savedLeads
+                    .filter((l) => l.status === "rejected")
+                    .map((lead) => {
+                      const place: Place = {
+                        place_id: lead.place_id,
+                        name: lead.name || "Sin nombre",
+                        address: lead.address || "",
+                        website: lead.website || null,
+                        phone: lead.phone || null,
+                        location: { latitude: 0, longitude: 0 },
+                      };
+                      const demoAsset = assets.find(
+                        (a) => a.place_name === lead.name && a.type === "demo"
+                      );
+                      const proposalAsset = assets.find(
+                        (a) =>
+                          a.place_name === lead.name && a.type === "proposal"
+                      );
+                      return (
+                        <div
+                          key={lead.place_id}
+                          className="border border-gray-200 rounded-xl overflow-hidden shadow-sm grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all"
+                        >
+                          <PlaceCard
+                            place={place}
+                            savedLead={lead}
+                            demoId={demoAsset?.id}
+                            proposalId={proposalAsset?.id}
+                            isGenerating={generating === lead.place_id}
+                            onStatusChange={handleStatusChange}
+                            onGenerate={handleGenerate}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
           </Tabs.Content>
         </Tabs.Root>
       </div>

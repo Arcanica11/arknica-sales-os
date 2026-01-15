@@ -14,21 +14,7 @@ import {
   MapPin,
   Image as ImageIcon, // <--- ÚNICO CAMBIO EN IMPORTS
 } from "lucide-react";
-
-interface Place {
-  place_id: string;
-  name: string;
-  address: string;
-  website: string | null;
-  phone: string | null;
-  location: { latitude: number; longitude: number };
-}
-
-interface Lead {
-  place_id: string;
-  status: "new" | "contacted" | "sold";
-  id?: string;
-}
+import { Place, Lead } from "@/lib/types";
 
 interface PlaceCardProps {
   place: Place;
@@ -36,9 +22,10 @@ interface PlaceCardProps {
   demoId?: string;
   proposalId?: string;
   isGenerating: boolean;
+  searchCity?: string;
   onStatusChange: (
     placeId: string,
-    newStatus: "new" | "contacted" | "sold"
+    newStatus: "new" | "contacted" | "sold" | "rejected"
   ) => void;
   onGenerate: (place: Place, type: "demo" | "proposal") => void;
 }
@@ -49,6 +36,7 @@ export default function PlaceCard({
   demoId,
   proposalId,
   isGenerating,
+  searchCity,
   onStatusChange,
   onGenerate,
 }: PlaceCardProps) {
@@ -56,7 +44,7 @@ export default function PlaceCard({
   const currentStatus = savedLead?.status || "new";
 
   const handleStatusUpdate = async (
-    newStatus: "new" | "contacted" | "sold"
+    newStatus: "new" | "contacted" | "sold" | "rejected"
   ) => {
     setLoading(true);
     try {
@@ -66,10 +54,12 @@ export default function PlaceCard({
           {
             place_id: place.place_id,
             name: place.name,
-            city: "Unknown",
+            city: searchCity || "Unknown",
             category: "Unknown",
             status: newStatus,
             website: place.website,
+            address: place.address,
+            phone: place.phone,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "place_id" }
@@ -111,15 +101,23 @@ export default function PlaceCard({
     if (!place.phone) return;
 
     // 1. Mensaje Aleatorio (Para evitar baneo)
-    const saludos = ["Hola", "Qué tal", "Buenas", "Saludos a todo el equipo de"];
+    const saludos = [
+      "Hola",
+      "Qué tal",
+      "Buenas",
+      "Saludos a todo el equipo de",
+    ];
     const saludo = saludos[Math.floor(Math.random() * saludos.length)];
-    
+
     // 2. Contexto (Sin vender aún)
     const mensaje = `${saludo} ${place.name}, soy vecino de la zona. Hice un diseño visual rápido de cómo se verían sus uniformes y menús renovados. Les adjunto la imagen, ¿qué opinan?`;
 
     // 3. Abrir WhatsApp
     const phone = place.phone.replace(/[^0-9]/g, "");
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`, "_blank");
+    window.open(
+      `https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`,
+      "_blank"
+    );
 
     // 4. Marcar Contactado
     if (currentStatus === "new") handleStatusUpdate("contacted");
@@ -180,6 +178,29 @@ export default function PlaceCard({
             <MessageCircle size={16} />
           </button>
         )}
+
+        {/* 0. Botón Descartar (X) - NUEVO */}
+        <button
+          onClick={() => handleStatusUpdate("rejected")}
+          className="w-8 h-8 flex items-center justify-center bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg border border-gray-200 hover:border-red-200 transition-colors"
+          title="Descartar Lead"
+        >
+          <span className="sr-only">Descartar</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
 
         {/* 2. Google Maps Externo */}
         <a
