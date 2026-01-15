@@ -14,7 +14,6 @@ import {
   WifiOff,
 } from "lucide-react";
 import * as Tabs from "@radix-ui/react-tabs";
-import { cn } from "@/lib/utils";
 import clsx from "clsx";
 import { twMerge } from "tailwind-merge";
 import PlaceCard from "@/components/place-card";
@@ -66,7 +65,7 @@ export default function Dashboard() {
       .from("leads")
       .select("place_id, status, id");
     if (data) {
-      setSavedLeads(data as Lead[]); // Cast for safety
+      setSavedLeads(data as Lead[]);
     }
   };
 
@@ -163,120 +162,146 @@ export default function Dashboard() {
     });
   };
 
+  // Helper Logic
+  const isSocialMedia = (url: string | null) => {
+    if (!url) return false;
+    const lower = url.toLowerCase();
+    return (
+      lower.includes("facebook") ||
+      lower.includes("instagram") ||
+      lower.includes("tiktok") ||
+      lower.includes("twitter")
+    );
+  };
+
   // Filter Logic
   const filteredPlaces = places.filter((place) => {
-    if (filterMode === "no-web") return !place.website;
-    if (filterMode === "with-web") return !!place.website;
+    const hasEffectiveWebsite = place.website && !isSocialMedia(place.website);
+
+    if (filterMode === "no-web") {
+      // Show if NO website OR is Social Media
+      return !place.website || isSocialMedia(place.website);
+    }
+    if (filterMode === "with-web") {
+      // Show ONLY if has website AND it is NOT social media
+      return hasEffectiveWebsite;
+    }
     return true;
   });
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500/30">
+    <main className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600 drop-shadow-sm">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
               RUEDA LA ROLA{" "}
-              <span className="text-slate-100 not-italic">MEDIA</span>
+              <span className="text-orange-600 font-normal">MEDIA</span>
             </h1>
-            <p className="text-slate-500 text-xs tracking-widest uppercase font-bold">
+            <p className="text-gray-500 text-xs tracking-wider uppercase font-semibold mt-0.5">
               Lead Command Center
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors">
-              <div className="w-5 h-5 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full"></div>
-            </button>
+            <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              System Active
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+      <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
         {/* Search Panel */}
-        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+        <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <form
             onSubmit={(e) => handleSearch(e)}
-            className="grid grid-cols-1 md:grid-cols-12 gap-4"
+            className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end"
           >
-            <div className="md:col-span-5 space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Briefcase className="w-3 h-3" /> Rubro / Categoría
+            <div className="md:col-span-5 space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-orange-600" /> Rubro /
+                Categoría
               </label>
               <input
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ej. Restaurantes, Dentistas, Hoteles..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all font-medium"
+                placeholder="Ej. Restaurantes, Dentistas, Abogados..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none transition-all font-medium"
               />
             </div>
-            <div className="md:col-span-4 space-y-1">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <MapPin className="w-3 h-3" /> Ciudad Inicial
+            <div className="md:col-span-4 space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-600" /> Ciudad Inicial
               </label>
               <input
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Ej. Madrid, Medellín, CDMX..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-medium"
+                placeholder="Ej. Madrid, Bogotá, CDMX..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition-all font-medium"
               />
             </div>
-            <div className="md:col-span-3 flex items-end">
+            <div className="md:col-span-3">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-[50px] bg-gradient-to-br from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-orange-500/20 active:scale-95 flex items-center justify-center gap-2"
+                className="w-full h-[50px] bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-lg transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                {loading ? <Loader2 className="animate-spin" /> : <Search />}
-                BUSCAR LEADS
+                {loading ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Search className="w-5 h-5" />
+                )}
+                BUSCAR
               </button>
             </div>
           </form>
         </section>
 
-        {/* content Area with Tabs */}
+        {/* Content Area with Tabs */}
         <Tabs.Root
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex flex-col gap-6"
         >
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center border-b border-slate-800 pb-2 gap-4">
-            <Tabs.List className="flex gap-2">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-end border-b border-gray-200 pb-1 gap-4">
+            <Tabs.List className="flex gap-1">
               <Tabs.Trigger
                 value="list"
                 className={cnBase(
-                  "px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all",
+                  "px-5 py-2.5 rounded-t-lg font-semibold text-sm flex items-center gap-2 transition-all border-b-2",
                   activeTab === "list"
-                    ? "bg-slate-800 text-white shadow-lg"
-                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-900"
+                    ? "border-orange-500 text-orange-600 bg-orange-50/50"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <LayoutGrid size={16} /> VISTA LISTA
+                <LayoutGrid size={18} /> Resultados ({places.length})
               </Tabs.Trigger>
               <Tabs.Trigger
                 value="map"
                 className={cnBase(
-                  "px-6 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all",
+                  "px-5 py-2.5 rounded-t-lg font-semibold text-sm flex items-center gap-2 transition-all border-b-2",
                   activeTab === "map"
-                    ? "bg-slate-800 text-white shadow-lg"
-                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-900"
+                    ? "border-blue-500 text-blue-600 bg-blue-50/50"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <MapIcon size={16} /> VISTA MAPA
+                <MapIcon size={18} /> Explorar Mapa
               </Tabs.Trigger>
             </Tabs.List>
 
             {/* Filter Pills */}
-            <div className="flex bg-slate-900 p-1 rounded-lg">
+            <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm mb-2">
               <button
                 onClick={() => setFilterMode("all")}
                 className={cnBase(
-                  "px-3 py-1.5 text-xs font-bold rounded-md transition-colors",
+                  "px-4 py-1.5 text-xs font-bold rounded-md transition-colors",
                   filterMode === "all"
-                    ? "bg-slate-700 text-white shadow"
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "bg-gray-100 text-gray-900"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
                 Todos
@@ -284,36 +309,43 @@ export default function Dashboard() {
               <button
                 onClick={() => setFilterMode("no-web")}
                 className={cnBase(
-                  "px-3 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1",
+                  "px-4 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5",
                   filterMode === "no-web"
-                    ? "bg-red-500/20 text-red-400 shadow"
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "bg-red-50 text-red-600 ring-1 ring-red-200"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                <WifiOff size={12} /> Sin Sitio Web
+                <WifiOff size={14} /> Sin Sitio Web
               </button>
               <button
                 onClick={() => setFilterMode("with-web")}
                 className={cnBase(
-                  "px-3 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1",
+                  "px-4 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1.5",
                   filterMode === "with-web"
-                    ? "bg-green-500/20 text-green-400 shadow"
-                    : "text-slate-500 hover:text-slate-300"
+                    ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
-                <Globe size={12} /> Con Sitio Web
+                <Globe size={14} /> Con Sitio Web
               </button>
             </div>
           </div>
 
-          <Tabs.Content value="list" className="space-y-4 focus:outline-none">
+          <Tabs.Content
+            value="list"
+            className="space-y-8 focus:outline-none min-h-[500px]"
+          >
             {places.length === 0 && !loading && (
-              <div className="text-center py-20 text-slate-600">
-                <p>Define tus parámetros y busca leads potenciales.</p>
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                <Search className="w-12 h-12 mb-4 opacity-20" />
+                <p className="font-medium">
+                  Define rubro y ciudad para comenzar la búsqueda
+                </p>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20">
+            {/* Grid Container Fixed */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-24 items-start">
               {filteredPlaces.map((place) => (
                 <PlaceCard
                   key={place.place_id}
@@ -328,31 +360,34 @@ export default function Dashboard() {
             </div>
 
             {places.length > 0 && nextPageToken && (
-              <div className="flex justify-center pt-8 pb-12 w-full">
+              <div className="flex justify-center w-full">
                 <button
                   onClick={loadMore}
                   disabled={loading}
-                  className="w-full py-4 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-900 hover:border-slate-700 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
+                  className="w-full max-w-md py-4 border border-gray-200 bg-white text-gray-500 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300 rounded-xl font-bold flex items-center justify-center gap-3 transition-all shadow-sm"
                 >
                   {loading ? (
                     <Loader2 className="animate-spin" />
                   ) : (
                     <RefreshCw />
                   )}
-                  ⬇ Cargar 20 Resultados Más
+                  Cargar 20 Resultados Más
                 </button>
               </div>
             )}
           </Tabs.Content>
 
-          <Tabs.Content value="map" className="focus:outline-none h-[600px]">
+          <Tabs.Content
+            value="map"
+            className="focus:outline-none h-[600px] border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+          >
             <MapView
               apiKey={
                 process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
                 process.env.NEXT_PUBLIC_MAPS_API_KEY ||
                 ""
               }
-              places={filteredPlaces} // Use filtered places in map too? Usually yes if consistent.
+              places={filteredPlaces}
               onGenerate={handleGenerate}
               onSearchArea={handleAreaSearch}
             />

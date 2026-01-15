@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9fafb; /* gray-50 */
+  --foreground: #111827; /* gray-900 */
 }
 
 @theme inline {
@@ -12,12 +12,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Force light mode variables even if system prefers dark, or just remove the media query */
+/* We want strictly clean corporate light theme as requested */
 
 body {
   background: var(--background);
